@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Env & secrets
+.env
+.env.local
+*.pem
+*.key
+
+# Local databases (seeded demo data is reproducible via `make seed`)
+data/*.db
+data/*.sqlite3
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Freebuff workspace metadata
+.freebuff/

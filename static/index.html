@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RecoverAI — Failed-Payment Recovery Agent</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink: { 950: '#070b14', 900: '#0b1120', 850: '#0f172a', 800: '#151f36', 700: '#1e293b' },
+          },
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+        },
+      },
+    };
+  </script>
+  <style>
+    body { background:
+      radial-gradient(1200px 500px at 15% -10%, rgba(79,70,229,.16), transparent 60%),
+      radial-gradient(900px 400px at 95% 0%, rgba(16,185,129,.10), transparent 55%),
+      #070b14; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #263352; border-radius: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    .fade-in { animation: fadeIn .25s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(3px);} to { opacity: 1; transform: none; } }
+  </style>
+</head>
+<body class="min-h-screen text-slate-200 font-sans antialiased">
+
+  <!-- ======================= HEADER ======================= -->
+  <header class="sticky top-0 z-40 backdrop-blur bg-ink-950/80 border-b border-white/5">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
+      <div class="flex items-center gap-3 mr-auto">
+        <div class="h-9 w-9 rounded-lg bg-gradient-to-br from-indigo-500 to-emerald-400 grid place-items-center shadow-lg shadow-indigo-500/20">
+          <span class="text-ink-950 font-black text-lg">R</span>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight tracking-tight">RecoverAI
+            <span class="text-slate-500 font-medium text-sm">· Failed-Payment Recovery Agent</span>
+          </h1>
+          <p class="text-[11px] text-slate-500 leading-tight">Razorpay AI Buildathon · Track: AI Revenue Recovery</p>
+        </div>
+      </div>
+
+      <span class="text-[10px] font-bold tracking-widest px-2.5 py-1 rounded-md bg-amber-400/10 text-amber-300 border border-amber-400/30">
+        ⚠ SIMULATED DATA
+      </span>
+      <span id="llm-pill" class="text-xs px-2.5 py-1 rounded-md border"></span>
+      <span id="clock-pill" class="text-xs px-2.5 py-1 rounded-md border border-white/10 bg-white/5 text-slate-300 font-mono"></span>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- ======================= KPI CARDS ======================= -->
+    <section class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+      <div class="rounded-xl border border-white/5 bg-ink-900/70 p-4">
+        <p class="text-xs text-slate-400">Total failed</p>
+        <p id="kpi-failed" class="text-2xl font-bold mt-1 text-slate-100">—</p>
+        <p id="kpi-failed-sub" class="text-[11px] text-slate-500 mt-0.5">—</p>
+      </div>
+      <div class="rounded-xl border border-emerald-400/10 bg-emerald-400/5 p-4">
+        <p class="text-xs text-emerald-300/80">Recovered (agent)</p>
+        <p id="kpi-recovered" class="text-2xl font-bold mt-1 text-emerald-300">—</p>
+        <p id="kpi-recovered-sub" class="text-[11px] text-emerald-200/50 mt-0.5">—</p>
+      </div>
+      <div class="rounded-xl border border-white/5 bg-ink-900/70 p-4">
+        <p class="text-xs text-slate-400">Recovery rate</p>
+        <p id="kpi-rate" class="text-2xl font-bold mt-1 text-indigo-300">—</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">simulated outcomes</p>
+      </div>
+      <div class="rounded-xl border border-white/5 bg-ink-900/70 p-4">
+        <p class="text-xs text-slate-400">At-risk</p>
+        <p id="kpi-atrisk" class="text-2xl font-bold mt-1 text-amber-300">—</p>
+        <p id="kpi-atrisk-sub" class="text-[11px] text-slate-500 mt-0.5">—</p>
+      </div>
+      <div class="rounded-xl border border-rose-400/10 bg-rose-400/5 p-4">
+        <p class="text-xs text-rose-300/80">Human review</p>
+        <p id="kpi-review" class="text-2xl font-bold mt-1 text-rose-300">—</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">> ₹25,000 or risk-flagged</p>
+      </div>
+    </section>
+
+    <!-- ======================= CONTROLS ======================= -->
+    <section class="flex flex-wrap items-center gap-3 rounded-xl border border-white/5 bg-ink-900/70 px-4 py-3">
+      <button id="btn-run" class="px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white font-semibold text-sm shadow-lg shadow-indigo-500/25 transition disabled:opacity-50 disabled:cursor-not-allowed">
+        ▶ Run agent
+      </button>
+      <button id="btn-ff" class="px-4 py-2 rounded-lg bg-emerald-500/90 hover:bg-emerald-400 text-ink-950 font-semibold text-sm shadow-lg shadow-emerald-500/20 transition disabled:opacity-50 disabled:cursor-not-allowed">
+        ⏩ Fast-forward 24h
+      </button>
+      <button id="btn-reset-clock" class="px-3 py-2 rounded-lg border border-white/10 hover:bg-white/5 text-slate-300 text-sm transition">Reset clock</button>
+      <label class="flex items-center gap-2 text-xs text-slate-400 ml-1">
+        <input id="auto-refresh" type="checkbox" class="accent-indigo-400" checked /> auto-refresh 10s
+      </label>
+      <span id="run-status" class="text-xs text-slate-400 ml-auto"></span>
+    </section>
+
+    <!-- ======================= CHARTS ======================= -->
+    <section class="grid lg:grid-cols-2 gap-4">
+      <div class="rounded-xl border border-white/5 bg-ink-900/70 p-4">
+        <h2 class="text-sm font-semibold text-slate-300 mb-1">Failures by reason</h2>
+        <p class="text-[11px] text-slate-500 mb-3">seeded synthetic dataset · 300 payments · 14 days</p>
+        <div class="h-64"><canvas id="chart-reasons"></canvas></div>
+      </div>
+      <div class="rounded-xl border border-white/5 bg-ink-900/70 p-4">
+        <h2 class="text-sm font-semibold text-slate-300 mb-1">Recovery: baseline vs RecoverAI</h2>
+        <p class="text-[11px] text-slate-500 mb-3">same seeded data · baseline = organic recoveries only · <span class="text-amber-300">outcomes simulated</span></p>
+        <div class="h-64"><canvas id="chart-recovery"></canvas></div>
+      </div>
+    </section>
+
+    <!-- ======================= QUEUE + MESSAGE PREVIEW ======================= -->
+    <section class="grid xl:grid-cols-3 gap-4">
+      <!-- Queue -->
+      <div class="xl:col-span-2 rounded-xl border border-white/5 bg-ink-900/70 overflow-hidden">
+        <div class="px-4 py-3 border-b border-white/5 flex items-center">
+          <h2 class="text-sm font-semibold text-slate-300">Prioritized recovery queue</h2>
+          <span id="queue-count" class="text-[11px] text-slate-500 ml-2">—</span>
+          <span class="ml-auto text-[11px] text-slate-500">sorted by expected recovered ₹</span>
+        </div>
+        <div class="max-h-[460px] overflow-y-auto">
+          <table class="w-full text-sm">
+            <thead class="sticky top-0 bg-ink-850 text-[11px] uppercase tracking-wider text-slate-500">
+              <tr>
+                <th class="text-left font-medium px-4 py-2">Payment</th>
+                <th class="text-right font-medium px-3 py-2">Amount</th>
+                <th class="text-left font-medium px-3 py-2">Reason</th>
+                <th class="text-left font-medium px-3 py-2">Action</th>
+                <th class="text-left font-medium px-3 py-2">Rule</th>
+                <th class="text-right font-medium px-3 py-2">Exp. ₹</th>
+                <th class="text-right font-medium px-4 py-2"></th>
+              </tr>
+            </thead>
+            <tbody id="queue-body" class="divide-y divide-white/5"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Message preview -->
+      <div class="rounded-xl border border-white/5 bg-ink-900/70 p-4 flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-sm font-semibold text-slate-300">Message preview</h2>
+          <span id="msg-source-badge" class="hidden text-[10px] font-bold tracking-wider px-2 py-0.5 rounded"></span>
+        </div>
+        <p id="msg-payment" class="text-[11px] text-slate-500 mb-3">select a queue row</p>
+        <div id="msg-body" class="flex-1 rounded-lg bg-ink-950/80 border border-white/5 p-4 text-sm leading-relaxed text-slate-300 grid place-items-center text-slate-500">
+          Click a payment in the queue to preview its customer message.
+        </div>
+        <div id="msg-meta" class="mt-2 text-[11px] text-slate-500 space-y-0.5"></div>
+        <p class="mt-3 text-[10px] leading-relaxed text-slate-600 border-t border-white/5 pt-2">
+          The LLM only writes copy; a strict validator checks amount, link, language, length and
+          forbids discounts/urgency. Any violation → template fallback. Deterministic code makes
+          every money decision.
+        </p>
+      </div>
+    </section>
+
+    <!-- ======================= AUDIT TRAIL ======================= -->
+    <section class="rounded-xl border border-white/5 bg-ink-900/70 overflow-hidden">
+      <div class="px-4 py-3 border-b border-white/5 flex items-center">
+        <h2 class="text-sm font-semibold text-slate-300">Live audit trail</h2>
+        <span class="text-[11px] text-slate-500 ml-2">append-only · every decision &amp; action</span>
+        <span id="audit-live" class="ml-auto flex items-center gap-1.5 text-[11px] text-slate-500">
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span> live
+        </span>
+      </div>
+      <div id="audit-body" class="max-h-80 overflow-y-auto divide-y divide-white/5"></div>
+    </section>
+
+    <footer class="text-center text-[11px] text-slate-600 py-4">
+      RecoverAI demo · All amounts, payments, customers and recovery outcomes are
+      <span class="text-amber-400/80">simulated</span> on a seeded synthetic dataset. No real
+      merchant data. No discounts, ever.
+    </footer>
+  </main>
+
+<script>
+/* ============================ helpers ============================ */
+const $ = (id) => document.getElementById(id);
+const inr = (paise) => '₹' + new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(paise / 100);
+const inrFull = (paise) => '₹' + new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(paise / 100);
+
+const ACTION_STYLES = {
+  nudge:  'bg-emerald-400/10 text-emerald-300 border-emerald-400/30',
+  retry:  'bg-sky-400/10 text-sky-300 border-sky-400/30',
+  wait:   'bg-amber-400/10 text-amber-300 border-amber-400/30',
+  hold:   'bg-orange-400/10 text-orange-300 border-orange-400/30',
+  ignore: 'bg-slate-400/10 text-slate-400 border-slate-400/30',
+  review: 'bg-rose-400/10 text-rose-300 border-rose-400/30',
+};
+const OUTCOME_STYLES = {
+  message_sent: 'text-emerald-300', recovered: 'text-emerald-300',
+  retry_scheduled: 'text-sky-300', wait_started: 'text-amber-300',
+  held: 'text-orange-300', flagged: 'text-rose-300',
+  skipped_guardrail: 'text-slate-400', no_response: 'text-slate-400',
+  error: 'text-red-400', approved: 'text-emerald-300', skipped: 'text-slate-400',
+};
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+  return res.json();
+}
+function badge(classes, text) { return `<span class="text-[10px] font-semibold px-2 py-0.5 rounded border ${classes}">${text}</span>`; }
+
+/* ============================ state ============================ */
+let selectedPayment = null;
+let reasonsChart = null, recoveryChart = null;
+
+/* ============================ KPIs ============================ */
+async function refreshKpis() {
+  const k = await api('/api/kpis');
+  $('kpi-failed').textContent = inr(k.total_failed_paise);
+  $('kpi-failed-sub').textContent = `${k.failed_count} failed payments`;
+  $('kpi-recovered').textContent = inr(k.recovered_paise);
+  $('kpi-recovered-sub').textContent = `${k.recovered_count} payments recovered`;
+  $('kpi-rate').textContent = k.recovery_rate_pct.toFixed(1) + '%';
+  $('kpi-atrisk').textContent = inr(k.at_risk_paise);
+  $('kpi-atrisk-sub').textContent = `${k.failed_count - k.recovered_count} open`;
+  $('kpi-review').textContent = k.human_review_count;
+  $('clock-pill').textContent = '🕒 ' + k.now_iso.replace('T', ' ').replace('Z', ' UTC') + (k.clock_offset_seconds > 0 ? ' (+' + Math.round(k.clock_offset_seconds / 3600) + 'h sim)' : '');
+}
+
+/* ============================ meta pills ============================ */
+async function refreshMeta() {
+  const m = await api('/api/meta');
+  const pill = $('llm-pill');
+  if (m.llm_configured) { pill.className = 'text-xs px-2.5 py-1 rounded-md border border-violet-400/30 bg-violet-400/10 text-violet-300'; pill.textContent = '✦ Gemini connected'; }
+  else { pill.className = 'text-xs px-2.5 py-1 rounded-md border border-white/10 bg-white/5 text-slate-400'; pill.textContent = 'LLM off · template mode'; }
+}
+
+/* ============================ queue ============================ */
+async function refreshQueue() {
+  const q = await api('/api/queue');
+  const body = $('queue-body');
+  $('queue-count').textContent = `· ${q.items.length} open`;
+  const top = q.items.slice(0, 60);
+  body.innerHTML = top.map((it) => {
+    const isReview = it.action === 'review';
+    const actions = isReview
+      ? `<button data-approve="${it.payment_id}" class="approve-btn px-2.5 py-1 rounded-md bg-emerald-500/90 hover:bg-emerald-400 text-ink-950 text-[11px] font-bold transition">Approve</button>
+         <button data-skip="${it.payment_id}" class="skip-btn px-2.5 py-1 rounded-md border border-white/10 hover:bg-white/5 text-slate-400 text-[11px] transition">Skip</button>`
+      : `<button data-select="${it.payment_id}" class="select-btn px-2.5 py-1 rounded-md border border-white/10 hover:bg-white/5 text-slate-400 text-[11px] transition">Preview</button>`;
+    return `<tr class="hover:bg-white/[.03] cursor-pointer ${selectedPayment === it.payment_id ? 'bg-indigo-500/5' : ''}" data-select="${it.payment_id}">
+      <td class="px-4 py-2.5">
+        <div class="font-medium text-slate-200">${it.customer_name || 'Customer'} <span class="text-slate-500 text-xs">· ${it.payment_id}</span></div>
+        <div class="text-[11px] text-slate-500">${it.method} · ${it.category.replace('_',' ')}${it.opted_out ? ' · <span class=\"text-rose-300\">opted-out</span>' : ''}${it.recovery_attempts ? ' · ' + it.recovery_attempts + ' attempt(s)' : ''}</div>
+      </td>
+      <td class="px-3 py-2.5 text-right font-mono">${inrFull(it.amount_paise)}</td>
+      <td class="px-3 py-2.5 text-slate-400 text-xs">${it.reason}</td>
+      <td class="px-3 py-2.5">${badge(ACTION_STYLES[it.action] || ACTION_STYLES.ignore, it.action)}${it.needs_human_review && !it.human_approved ? badge('bg-rose-400/10 text-rose-300 border-rose-400/30 ml-1','review') : ''}</td>
+      <td class="px-3 py-2.5"><span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-slate-400">${it.rule_id}</span></td>
+      <td class="px-3 py-2.5 text-right font-mono ${it.expected_recovery_paise > 0 ? 'text-emerald-300' : 'text-slate-600'}">${it.expected_recovery_paise > 0 ? inr(it.expected_recovery_paise) : '—'}</td>
+      <td class="px-4 py-2.5 text-right whitespace-nowrap">${actions}</td>
+    </tr>`;
+  }).join('');
+
+  body.querySelectorAll('[data-select]').forEach((el) =>
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('button') && !e.target.classList.contains('select-btn')) return;
+      selectPayment(el.getAttribute('data-select'));
+    }));
+  body.querySelectorAll('[data-approve]').forEach((b) =>
+    b.addEventListener('click', () => reviewPayment(b.getAttribute('data-approve'), true)));
+  body.querySelectorAll('[data-skip]').forEach((b) =>
+    b.addEventListener('click', () => reviewPayment(b.getAttribute('data-skip'), false)));
+}
+
+/* ============================ message preview ============================ */
+async function selectPayment(paymentId) {
+  selectedPayment = paymentId;
+  refreshQueue();
+  $('msg-payment').textContent = paymentId;
+  $('msg-body').innerHTML = '<span class="text-slate-500 animate-pulse">composing…</span>';
+  $('msg-meta').innerHTML = '';
+  const m = await api(`/api/payments/${paymentId}/message`);
+  const badgeEl = $('msg-source-badge');
+  badgeEl.classList.remove('hidden');
+  if (m.source === 'llm') {
+    badgeEl.className = 'text-[10px] font-bold tracking-wider px-2 py-0.5 rounded bg-violet-400/15 text-violet-300 border border-violet-400/30';
+    badgeEl.textContent = '✦ LLM';
+  } else {
+    badgeEl.className = 'text-[10px] font-bold tracking-wider px-2 py-0.5 rounded bg-white/5 text-slate-400 border border-white/10';
+    badgeEl.textContent = 'TEMPLATE' + (m.fallback_used ? ' (FALLBACK)' : '');
+  }
+  $('msg-body').className = 'flex-1 rounded-lg bg-ink-950/80 border border-white/5 p-4 text-sm leading-relaxed text-slate-200 fade-in';
+  $('msg-body').textContent = m.text + (m.preview ? '' : '  ✉ (sent)');
+  const bits = [];
+  if (m.preview) bits.push('live preview — not sent');
+  if (m.fallback_used) bits.push(`<span class="text-amber-300">fallback: ${m.fallback_reason || 'llm failed'}</span>`);
+  if (m.llm_latency_ms) bits.push(`LLM ${m.llm_latency_ms}ms`);
+  if (m.llm_output_tokens) bits.push(`${m.llm_output_tokens} out-tokens`);
+  $('msg-meta').innerHTML = bits.map((b) => `<div>${b}</div>`).join('');
+}
+
+/* ============================ review decisions ============================ */
+async function reviewPayment(paymentId, approve) {
+  await api(`/api/payments/${paymentId}/review`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ approve }),
+  });
+  await refreshAll();
+}
+
+/* ============================ audit trail ============================ */
+async function refreshAudit() {
+  const a = await api('/api/audit?limit=40');
+  $('audit-body').innerHTML = a.rows.map((r) => {
+    const outcome = `<span class="${OUTCOME_STYLES[r.outcome] || 'text-slate-400'} font-medium">${r.outcome.replace(/_/g, ' ')}</span>`;
+    const msg = r.message_text
+      ? `<div class="text-[11px] text-slate-400 mt-0.5 truncate">“${r.message_text}” <span class="text-slate-600">· ${r.message_source}</span></div>`
+      : '';
+    const sim = r.detail && r.detail.simulated ? ' <span class="text-amber-300/60 text-[10px]">sim</span>' : '';
+    return `<div class="px-4 py-2 flex gap-3 items-start hover:bg-white/[.02] fade-in">
+      <span class="text-[11px] text-slate-600 font-mono pt-0.5 whitespace-nowrap">${r.ts_iso.replace('T',' ').replace('Z','')}</span>
+      <span class="text-[11px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-slate-500 whitespace-nowrap">${r.rule_id || '·'}</span>
+      <div class="min-w-0">
+        <div class="text-xs text-slate-300"><span class="font-medium">${r.payment_id || 'system'}</span> · ${r.action} → ${outcome}${sim}</div>
+        <div class="text-[11px] text-slate-500 truncate">${r.reason || ''}</div>
+        ${msg}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ============================ charts ============================ */
+async function refreshCharts() {
+  const d = await api('/api/chart_data');
+  const labels = Object.keys(d.failures_by_reason);
+  const values = labels.map((k) => d.failures_by_reason[k]);
+
+  if (reasonsChart) reasonsChart.destroy();
+  reasonsChart = new Chart($('chart-reasons'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'failures', data: values, backgroundColor: 'rgba(99,102,241,.65)', borderColor: 'rgba(129,140,248,1)', borderWidth: 1, borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#64748b', font: { size: 10 } } },
+                y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#64748b' } } } },
+  });
+
+  const rc = d.recovery_comparison;
+  if (recoveryChart) recoveryChart.destroy();
+  recoveryChart = new Chart($('chart-recovery'), {
+    type: 'bar',
+    data: { labels: ['Baseline (no agent)', 'RecoverAI'],
+      datasets: [{ label: 'recovered ₹ (simulated)',
+        data: [rc.baseline_recovered_paise / 100, rc.agent_recovered_paise / 100],
+        backgroundColor: ['rgba(100,116,139,.5)', 'rgba(16,185,129,.65)'],
+        borderColor: ['rgba(148,163,184,1)', 'rgba(52,211,153,1)'], borderWidth: 1, borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
+                y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#64748b' } } } },
+  });
+}
+
+/* ============================ actions ============================ */
+async function runAgent() {
+  const btn = $('btn-run'); btn.disabled = true; $('run-status').textContent = 'running…';
+  try {
+    const s = await api('/api/agent/run', { method: 'POST' });
+    $('run-status').innerHTML =
+      `${s.decided} decided · <span class="text-sky-300">${s.retries} retries</span> · <span class="text-emerald-300">${s.nudges} nudges</span>` +
+      ` · <span class="text-amber-300">${s.waits} waits</span> · <span class="text-orange-300">${s.holds} holds</span> · <span class="text-rose-300">${s.reviews} review</span> · ${s.ignores} skipped` +
+      (s.errors ? ` · <span class="text-red-400">${s.errors} errors</span>` : '') +
+      (s.recovered_now ? ` · <span class="text-emerald-300 font-semibold">recovered ${inr(s.recovered_amount_paise)}</span>` : '') +
+      ` · LLM ${s.llm_used}/${s.template_used} template`;
+  } catch (e) { $('run-status').innerHTML = `<span class="text-red-400">${e.message}</span>`; }
+  btn.disabled = false;
+  await refreshAll();
+}
+
+async function fastForward() {
+  const btn = $('btn-ff'); btn.disabled = true; $('run-status').textContent = 'fast-forwarding…';
+  try {
+    const r = await api('/api/clock/advance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hours: 24 }) });
+    $('run-status').textContent = `⏩ +${r.advanced_hours}h · ${r.outcomes_resolved} outcome(s) resolved` +
+      (r.recovered_paise ? ` · recovered ${inr(r.recovered_paise)}` : '');
+  } catch (e) { $('run-status').innerHTML = `<span class="text-red-400">${e.message}</span>`; }
+  btn.disabled = false;
+  await refreshAll();
+}
+
+async function resetClock() {
+  await api('/api/clock/reset', { method: 'POST' });
+  $('run-status').textContent = 'clock reset';
+  await refreshAll();
+}
+
+async function refreshAll() {
+  await Promise.all([refreshKpis(), refreshQueue(), refreshAudit(), refreshCharts()]);
+}
+
+/* ============================ boot ============================ */
+$('btn-run').addEventListener('click', runAgent);
+$('btn-ff').addEventListener('click', fastForward);
+$('btn-reset-clock').addEventListener('click', resetClock);
+
+setInterval(async () => {
+  if ($('auto-refresh').checked) { try { await refreshAll(); } catch {} }
+}, 10000);
+
+refreshMeta();
+refreshAll();
+</script>
+</body>
+</html>
